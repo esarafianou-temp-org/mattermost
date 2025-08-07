@@ -78,8 +78,8 @@ func createPost(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	post.SanitizeInput()
-	post.UserId = c.AppContext.Session().UserId
+    post.SanitizeInput()
+    post.UserId = c.AppContext.Session().UserId
 
 	auditRec := c.MakeAuditRecord(model.AuditEventCreatePost, model.AuditStatusFail)
 	defer c.LogAuditRecWithLevel(auditRec, app.LevelContent)
