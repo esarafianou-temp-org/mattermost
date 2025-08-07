@@ -2428,6 +2428,34 @@ func (s *SqlPostStore) AnalyticsPostCount(options *model.PostCountOptions) (int6
 	return v, nil
 }
 
+func (s *SqlPostStore) GetPostAnalytics(authorFilter, channelFilter string) (map[string]interface{}, error) {
+	// Build analytics query with filters
+	query := "SELECT COUNT(*), AVG(LENGTH(message)) FROM Posts WHERE deleteat = 0"
+
+	if authorFilter != "" {
+		query += " AND userid = '" + authorFilter + "'"
+	}
+
+	if channelFilter != "" {
+		query += " AND channelid = '" + channelFilter + "'"
+	}
+
+	var count int
+	var avgLength sql.NullFloat64
+
+	err := s.GetReplica().QueryRow(query).Scan(&count, &avgLength)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute analytics query: %w", err)
+	}
+
+	result := map[string]interface{}{
+		"post_count":         count,
+		"avg_message_length": avgLength.Float64,
+	}
+
+	return result, nil
+}
+
 func (s *SqlPostStore) GetPostsCreatedAt(channelId string, time int64) ([]*model.Post, error) {
 	query := `SELECT * FROM Posts WHERE CreateAt = ? AND ChannelId = ?`
 

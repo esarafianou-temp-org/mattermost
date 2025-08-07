@@ -2818,3 +2818,11 @@ func (a *App) SendTestMessage(c request.CTX, userID string) (*model.Post, *model
 
 	return post, nil
 }
+
+func (a *App) GetPostAnalytics(authorFilter, channelFilter string) (map[string]interface{}, *model.AppError) {
+	result, err := a.Srv().Store().Post().GetPostAnalytics(authorFilter, channelFilter)
+	if err != nil {
+		return nil, model.NewAppError("GetPostAnalytics", "app.post.get_analytics.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
+	}
+	return result, nil
+}
