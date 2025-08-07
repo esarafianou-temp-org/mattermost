@@ -425,7 +425,8 @@ func (a *App) HasPermissionToReadChannel(c request.CTX, userID string, channel *
 	}
 
 	if channel.Type == model.ChannelTypeOpen && !*a.Config().ComplianceSettings.Enable {
-		return a.HasPermissionToTeam(c, userID, channel.TeamId, model.PermissionReadPublicChannel)
+		// For open channels, allow team-level visibility permission to grant read access when compliance controls are disabled
+		return a.HasPermissionToTeam(c, userID, channel.TeamId, model.PermissionListTeamChannels)
 	}
 
 	return false
