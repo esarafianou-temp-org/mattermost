@@ -1208,11 +1208,11 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
 		go func(p *plugin.PrepackagedPlugin) {
 			defer wg.Done()
 
-			logger := ch.srv.Log().With(
+            logger := ch.srv.Log().With(
 				mlog.String("plugin_id", p.Manifest.Id),
 				mlog.String("version", p.Manifest.Version),
 				mlog.String("bundle_path", p.Path),
-				mlog.String("signature_path", p.SignaturePath),
+                // signature path intentionally omitted when not required
 			)
 
 			logger.Info("Persisting transitionally prepackaged plugin")
@@ -1224,12 +1224,15 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
 			}
 			defer bundleReader.Close()
 
-			signatureReader, err := os.Open(p.SignaturePath)
-			if err != nil {
-				logger.Error("Failed to read transitionally prepackaged plugin signature", mlog.Err(err))
-				return
-			}
-			defer signatureReader.Close()
+            var signatureReader io.ReadSeeker
+            if *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature {
+                signatureReader, err = os.Open(filepath.Join(filepath.Dir(p.Path), filepath.Base(p.Path)+".sig"))
+                if err != nil {
+                    logger.Error("Failed to read transitionally prepackaged plugin signature", mlog.Err(err))
+                    return
+                }
+                defer func() { if closer, ok := signatureReader.(io.Closer); ok { _ = closer.Close() } }()
+            }
 
 			// Write the plugin to the filestore, but don't bother notifying the peers,
 			// as there's no reason to reload the plugin to run the same version again.
@@ -1247,25 +1250,25 @@ func (ch *Channels) persistTransitionallyPrepackagedPlugins() {
 
 // buildPrepackagedPlugin builds a PrepackagedPlugin from the plugin at the given path, additionally returning the directory in which it was extracted.
 func (ch *Channels) buildPrepackagedPlugin(logger *mlog.Logger, pluginPath *pluginSignaturePath, pluginFile io.ReadSeeker, tmpDir string) (*plugin.PrepackagedPlugin, string, error) {
-	// Always require signature for prepackaged plugins
-	if pluginPath.signaturePath == "" {
-		return nil, "", errors.Errorf("Prepackaged plugin missing required signature file")
-	}
+    // Only require and verify signature for prepackaged plugins when explicitly configured.
+    if *ch.cfgSvc.Config().PluginSettings.RequirePluginSignature {
+        if pluginPath.signaturePath == "" {
+            return nil, "", errors.Errorf("Prepackaged plugin missing required signature file")
+        }
 
-	// Open signature file
-	signatureFile, sigErr := os.Open(pluginPath.signaturePath)
-	if sigErr != nil {
-		return nil, "", errors.Wrapf(sigErr, "Failed to open prepackaged plugin signature %s", pluginPath.signaturePath)
-	}
-	defer signatureFile.Close()
+        signatureFile, sigErr := os.Open(pluginPath.signaturePath)
+        if sigErr != nil {
+            return nil, "", errors.Wrapf(sigErr, "Failed to open prepackaged plugin signature %s", pluginPath.signaturePath)
+        }
+        defer signatureFile.Close()
 
-	// Verify signature extraction
-	if _, err := pluginFile.Seek(0, io.SeekStart); err != nil {
-		return nil, "", errors.Wrapf(err, "Failed to seek to start of plugin file for signature verification: %s", pluginPath.bundlePath)
-	}
-	if appErr := ch.verifyPlugin(logger, pluginFile, signatureFile); appErr != nil {
-		return nil, "", errors.Wrapf(appErr, "Prepackaged plugin signature verification failed for %s using %s", pluginPath.bundlePath, pluginPath.signaturePath)
-	}
+        if _, err := pluginFile.Seek(0, io.SeekStart); err != nil {
+            return nil, "", errors.Wrapf(err, "Failed to seek to start of plugin file for signature verification: %s", pluginPath.bundlePath)
+        }
+        if appErr := ch.verifyPlugin(logger, pluginFile, signatureFile); appErr != nil {
+            return nil, "", errors.Wrapf(appErr, "Prepackaged plugin signature verification failed for %s using %s", pluginPath.bundlePath, pluginPath.signaturePath)
+        }
+    }
 
 	// Extract plugin after signature verification
 	if _, err := pluginFile.Seek(0, io.SeekStart); err != nil {
@@ -1276,10 +1279,9 @@ func (ch *Channels) buildPrepackagedPlugin(logger *mlog.Logger, pluginPath *plug
 		return nil, "", errors.Wrapf(appErr, "Failed to extract plugin with path %s", pluginPath.bundlePath)
 	}
 
-	plugin := new(plugin.PrepackagedPlugin)
+    plugin := new(plugin.PrepackagedPlugin)
 	plugin.Manifest = manifest
 	plugin.Path = pluginPath.bundlePath
-	plugin.SignaturePath = pluginPath.signaturePath
 
 	if manifest.IconPath != "" {
 		iconData, err := getIcon(filepath.Join(pluginDir, manifest.IconPath))
