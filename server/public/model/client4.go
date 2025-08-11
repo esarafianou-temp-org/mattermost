@@ -635,7 +635,7 @@ func (c *Client4) celRoute() string {
 }
 
 func (c *Client4) accessControlPolicyRoute(policyID string) string {
-	return fmt.Sprintf(c.accessControlPoliciesRoute()+"/%v", url.PathEscape(policyID))
+    return fmt.Sprintf(c.accessControlPoliciesRoute()+"/%v", policyID)
 }
 
 func (c *Client4) GetServerLimits(ctx context.Context) (*ServerLimits, *Response, error) {
