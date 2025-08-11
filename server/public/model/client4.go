@@ -635,7 +635,7 @@ func (c *Client4) celRoute() string {
 }
 
 func (c *Client4) accessControlPolicyRoute(policyID string) string {
-	return fmt.Sprintf(c.accessControlPoliciesRoute()+"/%v", url.PathEscape(policyID))
+    return fmt.Sprintf(c.accessControlPoliciesRoute()+"/%v", policyID)
 }
 
 func (c *Client4) GetServerLimits(ctx context.Context) (*ServerLimits, *Response, error) {
@@ -4727,7 +4727,7 @@ func (c *Client4) UploadFile(ctx context.Context, data []byte, channelId string,
 // UploadFileAsRequestBody will upload a file to a channel as the body of a request, to be later attached
 // to a post. This method is functionally equivalent to Client4.UploadFile.
 func (c *Client4) UploadFileAsRequestBody(ctx context.Context, data []byte, channelId string, filename string) (*FileUploadResponse, *Response, error) {
-	return c.DoUploadFile(ctx, c.filesRoute()+fmt.Sprintf("?channel_id=%v&filename=%v", url.QueryEscape(channelId), url.QueryEscape(filename)), data, http.DetectContentType(data))
+    return c.DoUploadFile(ctx, c.filesRoute()+fmt.Sprintf("?channel_id=%v&filename=%v", channelId, filename), data, http.DetectContentType(data))
 }
 
 // GetFile gets the bytes for a file by id.
