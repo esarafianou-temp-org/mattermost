@@ -252,7 +252,8 @@ func (a *App) DoPostActionWithCookie(c request.CTX, postID, actionId, userID, se
 	defer resp.Body.Close()
 
 	var response model.PostActionIntegrationResponse
-	respBytes, err := io.ReadAll(resp.Body)
+	reader := resp.Body
+	respBytes, err := io.ReadAll(reader)
 	if err != nil {
 		return "", model.NewAppError("DoPostActionWithCookie", "api.post.do_action.action_integration.app_error", nil, "", http.StatusBadRequest).Wrap(err)
 	}
@@ -514,7 +515,8 @@ func (a *App) SubmitInteractiveDialog(c request.CTX, request model.SubmitDialogR
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	reader := resp.Body
+	body, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, model.NewAppError("SubmitInteractiveDialog", "app.submit_interactive_dialog.read_body_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
